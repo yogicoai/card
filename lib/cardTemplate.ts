@@ -75,9 +75,6 @@ export function buildCardHtml(people: CardPerson[], logoDataUri: string, fontCss
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Lora:wght@700&display=swap" rel="stylesheet">
 <style>
   ${fontCss}
   :root {
@@ -118,7 +115,7 @@ export function buildCardHtml(people: CardPerson[], logoDataUri: string, fontCss
   /* ── 1페이지: 뒷면(고정) ── */
   .back { display: flex; align-items: center; justify-content: center; }
   .slogan {
-    font-family: 'ITC Souvenir', 'Lora', Georgia, serif;
+    font-family: 'ITC Souvenir', 'Souvenir', serif;
     font-weight: 700;
     font-size: 17pt;
     color: var(--teal);
