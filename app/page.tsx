@@ -235,7 +235,7 @@ export default function Page() {
             <button className="btn-pdf" onClick={downloadPDF} disabled={busy}>
               📄 {busy ? "생성 중…" : "PDF 발주서 생성 (1인 1파일)"}
             </button>
-            <button className="btn-csv" onClick={exportCSV}>⬇ CSV (일러스트 병합용)</button>
+            {/* <button className="btn-csv" onClick={exportCSV}>⬇ CSV (일러스트 병합용)</button> */}
             <button className="btn-clear-all" onClick={clearAll}>전체 삭제</button>
           </div>
 

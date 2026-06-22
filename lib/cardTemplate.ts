@@ -44,8 +44,8 @@ const hasPersonal = (p: CardPerson) => {
   return v && v !== "x";
 };
 
-// 샘플 명함은 전화번호를 하이픈 없이 공백으로 구분: 010-4676-3827 → 010 4676 3827
-const tel = (s: string) => esc((s || "").trim().replace(/-/g, " "));
+// 전화번호 하이픈 유지 (요청에 따라 변경)
+const tel = (s: string) => esc((s || "").trim());
 
 /**
  * 한 사람의 2페이지 명함 HTML을 만든다.

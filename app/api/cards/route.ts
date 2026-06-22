@@ -43,6 +43,8 @@ async function renderPdf(browser: Browser, html: string): Promise<Uint8Array> {
   }
 }
 
+import clientPromise from "@/lib/mongodb";
+
 export async function POST(req: NextRequest) {
   let payload: Payload;
   try {
@@ -54,6 +56,23 @@ export async function POST(req: NextRequest) {
   const people = Array.isArray(payload.people) ? payload.people : [];
   if (people.length === 0) {
     return new Response(JSON.stringify({ error: "등록된 직원이 없습니다" }), { status: 400 });
+  }
+
+  // MongoDB에 발주 내역 저장 (비동기로 던지고 기다림)
+  try {
+    const client = await clientPromise;
+    const db = client.db(); // MONGODB_URI에 지정된 데이터베이스 사용
+    const collection = db.collection("card_orders");
+
+    await collection.insertOne({
+      month: payload.month || "0000-00",
+      peopleCount: people.length,
+      people: people,
+      createdAt: new Date(),
+    });
+  } catch (dbErr) {
+    console.error("MongoDB 발주 내역 저장 실패:", dbErr);
+    // 저장이 실패하더라도 PDF 생성은 계속 진행하도록 함.
   }
 
   const logo = await logoDataUri();
