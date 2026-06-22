@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import puppeteerCore from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 import puppeteer, { type Browser } from "puppeteer";
-import JSZip from "jszip";
 import { buildCardHtml, type CardPerson } from "@/lib/cardTemplate";
 
 export const runtime = "nodejs";
@@ -43,8 +42,6 @@ async function renderPdf(browser: Browser, html: string): Promise<Uint8Array> {
   }
 }
 
-import clientPromise from "@/lib/mongodb";
-
 export async function POST(req: NextRequest) {
   let payload: Payload;
   try {
@@ -56,23 +53,6 @@ export async function POST(req: NextRequest) {
   const people = Array.isArray(payload.people) ? payload.people : [];
   if (people.length === 0) {
     return new Response(JSON.stringify({ error: "등록된 직원이 없습니다" }), { status: 400 });
-  }
-
-  // MongoDB에 발주 내역 저장 (비동기로 던지고 기다림)
-  try {
-    const client = await clientPromise;
-    const db = client.db(); // MONGODB_URI에 지정된 데이터베이스 사용
-    const collection = db.collection("card_orders");
-
-    await collection.insertOne({
-      month: payload.month || "0000-00",
-      peopleCount: people.length,
-      people: people,
-      createdAt: new Date(),
-    });
-  } catch (dbErr) {
-    console.error("MongoDB 발주 내역 저장 실패:", dbErr);
-    // 저장이 실패하더라도 PDF 생성은 계속 진행하도록 함.
   }
 
   const origin = req.nextUrl.origin;
@@ -88,9 +68,8 @@ export async function POST(req: NextRequest) {
   if (isVercel) {
     browser = await puppeteerCore.launch({
       args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      headless: true,
     }) as unknown as Browser;
   } else {
     browser = await puppeteer.launch({
@@ -100,32 +79,20 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 단일 인원 → PDF 그대로 / 복수 인원 → ZIP
+    const buf = await renderPdf(browser, buildCardHtml(people, logoDataUri, fontCss));
+    let name = "";
     if (people.length === 1) {
-      const buf = await renderPdf(browser, buildCardHtml(people[0], logoDataUri, fontCss));
-      const name = pdfFileName(people[0], payload.month);
-      return new Response(buf as BodyInit, {
-        status: 200,
-        headers: {
-          "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
-        },
-      });
+      name = pdfFileName(people[0], payload.month);
+    } else {
+      const m = (payload.month || "").replace("-", "_") || "0000_00";
+      name = `${m}_매장_명함발주_통합(${people.length}인).pdf`;
     }
 
-    const zip = new JSZip();
-    for (const p of people) {
-      const buf = await renderPdf(browser, buildCardHtml(p, logoDataUri, fontCss));
-      zip.file(pdfFileName(p, payload.month), buf);
-    }
-    const zipBuf = await zip.generateAsync({ type: "uint8array" });
-    const m = (payload.month || "").replace("-", "") || "000000";
-    const zipName = `요기보_명함발주_${m}.zip`;
-    return new Response(zipBuf as BodyInit, {
+    return new Response(buf as BodyInit, {
       status: 200,
       headers: {
-        "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(zipName)}`,
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
       },
     });
   } catch (err) {

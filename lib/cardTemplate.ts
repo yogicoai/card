@@ -12,11 +12,10 @@ export interface CardPerson {
   telStore: string;     // 매장 번호(T)
   telPersonal: string;  // 개인 번호(M) — 'x'/빈값이면 숨김
   address: string;      // 매장 주소 한 줄  예: 신세계 센텀시티몰점 B2F 요기보
-  qty?: number;
 }
 
 // 인쇄용 재단선/블리드 가이드 표시 여부 (최종 입고 시 false 권장)
-const SHOW_GUIDES = true;
+const SHOW_GUIDES = false;
 
 function esc(s: string): string {
   return String(s ?? "")
@@ -33,10 +32,44 @@ const hasPersonal = (p: CardPerson) => {
 // 전화번호 하이픈 유지 (요청에 따라 변경)
 const tel = (s: string) => esc((s || "").trim());
 
-export function buildCardHtml(p: CardPerson, logoDataUri: string, fontCss: string): string {
+export function buildCardHtml(people: CardPerson[], logoDataUri: string, fontCss: string): string {
   const guides = SHOW_GUIDES
     ? `<div class="bleed-guide"></div><div class="trim-guide"></div>`
     : "";
+
+  const pagesHtml = people.map(p => `
+  <!-- 1페이지 · 앞면 (사람마다 다름) -->
+  <section class="page front">
+    ${guides}
+    <img class="logo" src="${logoDataUri}" alt="yogibo">
+    <div class="info">
+      <div class="name-row">
+        <span class="name-ko">${esc(p.nameKo)}</span>
+        <span class="name-en">${esc(p.nameEn)}</span>
+        <span class="title">/ ${esc(p.rank)}</span>
+      </div>
+      <div class="store">${esc(p.address || p.store)}</div>
+      <div class="contacts">
+        ${
+          hasPersonal(p)
+            ? `<div class="contact-line"><span class="lbl">M</span><span class="val">${tel(p.telPersonal)}</span></div>`
+            : ""
+        }
+        <div class="contact-line row-web">
+          <span class="seg"><span class="lbl">T</span><span class="val">${tel(p.telStore)}</span></span>
+          <span class="seg"><span class="lbl">WEB</span><span class="val lg">www.yogibo.kr</span></span>
+          <span class="seg"><span class="lbl">SNS</span><span class="val lg">yogibokorea</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2페이지 · 뒷면 (모든 사람 공통) -->
+  <section class="page back">
+    ${guides}
+    <div class="slogan">Discover the Feel</div>
+  </section>
+  `).join("");
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -135,39 +168,7 @@ export function buildCardHtml(p: CardPerson, logoDataUri: string, fontCss: strin
 </style>
 </head>
 <body>
-
-  <!-- 1페이지 · 뒷면 (모든 사람 공통) -->
-  <section class="page back">
-    ${guides}
-    <div class="slogan">Discover the Feel</div>
-  </section>
-
-  <!-- 2페이지 · 앞면 (사람마다 다름) -->
-  <section class="page front">
-    ${guides}
-    <img class="logo" src="${logoDataUri}" alt="yogibo">
-    <div class="info">
-      <div class="name-row">
-        <span class="name-ko">${esc(p.nameKo)}</span>
-        <span class="name-en">${esc(p.nameEn)}</span>
-        <span class="title">/ ${esc(p.rank)}</span>
-      </div>
-      <div class="store">${esc(p.address || p.store)}</div>
-      <div class="contacts">
-        ${
-          hasPersonal(p)
-            ? `<div class="contact-line"><span class="lbl">M</span><span class="val">${tel(p.telPersonal)}</span></div>`
-            : ""
-        }
-        <div class="contact-line row-web">
-          <span class="seg"><span class="lbl">T</span><span class="val">${tel(p.telStore)}</span></span>
-          <span class="seg"><span class="lbl">WEB</span><span class="val lg">www.yogibo.kr</span></span>
-          <span class="seg"><span class="lbl">SNS</span><span class="val lg">yogibokorea</span></span>
-        </div>
-      </div>
-    </div>
-  </section>
-
+  ${pagesHtml}
 </body>
 </html>`;
 }

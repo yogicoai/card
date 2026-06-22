@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
-interface Entry {
+interface Employee {
   store: string;
   nameKo: string;
   nameEn: string;
@@ -10,128 +10,201 @@ interface Entry {
   telStore: string;
   telPersonal: string;
   address: string;
-  qty: number;
+}
+
+interface OrderRecord {
+  _id: string;
+  month: string;
+  peopleCount: number;
+  people: Employee[];
+  createdAt: string;
+  createdAtKST: string;
+  updatedAtKST?: string;
 }
 
 const RANKS = ["Store Manager", "VMD", "Staff"];
-const emptyForm: Entry = {
-  store: "", nameKo: "", nameEn: "", rank: "Store Manager",
-  telStore: "", telPersonal: "", address: "", qty: 100,
-};
 
-// 매장(유선) 번호 자동 하이픈: 02는 2자리 지역번호, 그 외는 3자리.
-function formatStoreTel(value: string): string {
+const emptyEmployee = (): Employee => ({
+  store: "", nameKo: "", nameEn: "", rank: "Store Manager",
+  telStore: "", telPersonal: "", address: "",
+});
+
+function formatTel(value: string): string {
   const seoul = value.replace(/\D/g, "").startsWith("02");
   if (seoul) {
     const d = value.replace(/\D/g, "").slice(0, 10);
     if (d.length < 3) return d;
-    if (d.length < 7) return d.replace(/(\d{2})(\d+)/, "$1-$2");          // 02-XXX…
-    if (d.length < 10) return d.replace(/(\d{2})(\d{3})(\d+)/, "$1-$2-$3"); // 02-XXX-XXXX
-    return d.replace(/(\d{2})(\d{4})(\d+)/, "$1-$2-$3");                  // 02-XXXX-XXXX
+    if (d.length < 7) return d.replace(/(\d{2})(\d+)/, "$1-$2");
+    if (d.length < 10) return d.replace(/(\d{2})(\d{3})(\d+)/, "$1-$2-$3");
+    return d.replace(/(\d{2})(\d{4})(\d+)/, "$1-$2-$3");
   }
   const d = value.replace(/\D/g, "").slice(0, 11);
   if (d.length < 4) return d;
-  if (d.length < 8) return d.replace(/(\d{3})(\d+)/, "$1-$2");           // 0XX-XXX…
-  if (d.length < 11) return d.replace(/(\d{3})(\d{3})(\d+)/, "$1-$2-$3"); // 0XX-XXX-XXXX
-  return d.replace(/(\d{3})(\d{4})(\d+)/, "$1-$2-$3");                   // 0XX-XXXX-XXXX
+  if (d.length < 8) return d.replace(/(\d{3})(\d+)/, "$1-$2");
+  if (d.length < 11) return d.replace(/(\d{3})(\d{3})(\d+)/, "$1-$2-$3");
+  return d.replace(/(\d{3})(\d{4})(\d+)/, "$1-$2-$3");
 }
 
 export default function Page() {
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [form, setForm] = useState<Entry>(emptyForm);
+  const [employees, setEmployees] = useState<Employee[]>([emptyEmployee()]);
   const [month, setMonth] = useState("");
   const [toast, setToast] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
-  // 이번 달 기본값
+  // 수정 모드 상태
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editMonth, setEditMonth] = useState("");
+
   useEffect(() => {
     const now = new Date();
     setMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+    fetchOrders();
   }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(""), 2500);
+    setTimeout(() => setToast(""), 2800);
   };
 
-  const set = <K extends keyof Entry>(key: K, val: Entry[K]) =>
-    setForm((f) => ({ ...f, [key]: val }));
+  const fetchOrders = async () => {
+    try {
+      const res = await fetch("/api/orders");
+      if (res.ok) setOrders(await res.json());
+    } catch { /* 무시 */ }
+  };
 
-  const addEntry = () => {
-    const { store, nameKo, nameEn } = form;
-    if (!store.trim() || !nameKo.trim() || !nameEn.trim()) {
+  const setField = (idx: number, key: keyof Employee, val: string) => {
+    setEmployees(prev => prev.map((e, i) => i === idx ? { ...e, [key]: val } : e));
+  };
+
+  const addEmployee = () => setEmployees(prev => [...prev, emptyEmployee()]);
+
+  const removeEmployee = (idx: number) => {
+    if (employees.length === 1) return;
+    setEmployees(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // 수정 모드 진입
+  const startEdit = (order: OrderRecord, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(order._id);
+    setEditMonth(order.month);
+    setEmployees(order.people.map(p => ({ ...p })));
+    // 폼 상단으로 스크롤
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // 수정 취소
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditMonth("");
+    setEmployees([emptyEmployee()]);
+  };
+
+  // 수정 저장
+  const saveEdit = async () => {
+    const valid = employees.filter(e => e.store.trim() && e.nameKo.trim() && e.nameEn.trim());
+    if (valid.length === 0) {
       showToast("⚠ 매장명, 성명(한글), 성명(영문)은 필수입니다");
       return;
     }
-    setEntries((e) => [...e, { ...form, telPersonal: form.telPersonal.trim() || "x" }]);
-    showToast(`✓ ${nameKo} 추가 완료`);
-    setForm(emptyForm);
+    const people = valid.map(e => ({ ...e, telPersonal: e.telPersonal.trim() || "x" }));
+    setSaving(true);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingId, people, month: editMonth }),
+      });
+      if (!res.ok) throw new Error("수정 실패");
+      showToast("✓ 수정 완료");
+      cancelEdit();
+      fetchOrders();
+    } catch (err) {
+      showToast(`⚠ ${(err as Error).message}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const deleteEntry = (idx: number) => setEntries((e) => e.filter((_, i) => i !== idx));
-
-  const clearAll = () => {
-    if (entries.length === 0) return;
-    if (confirm(`전체 ${entries.length}명 삭제하시겠습니까?`)) setEntries([]);
+  // 목록 생성하기 (신규 저장)
+  const saveOrder = async () => {
+    const valid = employees.filter(e => e.store.trim() && e.nameKo.trim() && e.nameEn.trim());
+    if (valid.length === 0) {
+      showToast("⚠ 매장명, 성명(한글), 성명(영문)은 필수입니다");
+      return;
+    }
+    const people = valid.map(e => ({ ...e, telPersonal: e.telPersonal.trim() || "x" }));
+    setSaving(true);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ people, month }),
+      });
+      if (!res.ok) throw new Error("저장 실패");
+      showToast(`✓ 발주 목록 저장 완료 (${people.length}명)`);
+      setEmployees([emptyEmployee()]);
+      fetchOrders();
+    } catch (err) {
+      showToast(`⚠ ${(err as Error).message}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const totals = useMemo(() => ({
-    people: entries.length,
-    qty: entries.reduce((a, b) => a + b.qty, 0),
-    stores: new Set(entries.map((e) => e.store)).size,
-  }), [entries]);
-
-  // ── CSV (일러스트 데이터 병합용) ──
-  const exportCSV = () => {
-    if (entries.length === 0) return showToast("⚠ 등록된 직원이 없습니다");
-    const headers = ["성명한글", "성명영문", "직급", "매장번호", "개인번호", "매장주소", "수량"];
-    const rows = entries.map((e) =>
-      [e.nameKo, e.nameEn, e.rank, e.telStore, e.telPersonal === "x" ? "" : e.telPersonal, e.address || e.store, e.qty]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","));
-    const csv = "﻿" + [headers.map((h) => `"${h}"`).join(","), ...rows].join("\n");
-    download(new Blob([csv], { type: "text/csv;charset=utf-8;" }), `요기보_명함발주_${month.replace("-", "")}.csv`);
-    showToast("✓ CSV 다운로드 완료");
-  };
-
-  // ── PDF 발주서 (1인 1파일 → 복수면 ZIP) ──
-  const downloadPDF = async () => {
-    if (entries.length === 0) return showToast("⚠ 등록된 직원이 없습니다");
-    setBusy(true);
+  // PDF 다운로드
+  const downloadPDF = async (order: OrderRecord, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDownloading(order._id);
     showToast("⏳ PDF 생성 중…");
     try {
       const res = await fetch("/api/cards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ people: entries, month }),
+        body: JSON.stringify({ people: order.people, month: order.month }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "생성 실패");
       const blob = await res.blob();
       const cd = res.headers.get("Content-Disposition") || "";
       const m = /filename\*=UTF-8''([^;]+)/.exec(cd);
-      const fallback = entries.length === 1
-        ? `${month.replace("-", "_")}_매장_명함발주_${entries[0].nameKo}(1인).pdf`
-        : `요기보_명함발주_${month.replace("-", "")}.zip`;
-      download(blob, m ? decodeURIComponent(m[1]) : fallback);
-      showToast(`✓ PDF ${entries.length}건 다운로드 완료`);
+      const fallback = order.peopleCount === 1
+        ? `${order.month.replace("-", "_")}_매장_명함발주_${order.people[0].nameKo}(1인).pdf`
+        : `${order.month.replace("-", "_")}_매장_명함발주_통합(${order.peopleCount}인).pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = m ? decodeURIComponent(m[1]) : fallback;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("✓ PDF 다운로드 완료");
     } catch (err) {
       showToast(`⚠ ${(err as Error).message}`);
     } finally {
-      setBusy(false);
+      setDownloading(null);
     }
   };
 
-  const download = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  const deleteOrder = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("이 발주 내역을 삭제하시겠습니까?")) return;
+    try {
+      await fetch("/api/orders", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      setOrders(prev => prev.filter(o => o._id !== id));
+      if (editingId === id) cancelEdit();
+      showToast("✓ 발주 내역이 삭제되었습니다");
+    } catch {
+      showToast("⚠ 삭제 실패");
+    }
   };
 
-  const personalDisplay =
-    form.telPersonal && form.telPersonal.toLowerCase() !== "x" ? form.telPersonal : "";
-  const hasPreview = form.nameKo.trim() || form.nameEn.trim();
+  const isEditMode = !!editingId;
 
   return (
     <>
@@ -142,162 +215,176 @@ export default function Page() {
           <span className="subtitle">요기보코리아 마케팅디자인팀</span>
         </div>
         <div className="header-right">
-          <input type="month" className="month-input" value={month} onChange={(e) => setMonth(e.target.value)} />
-          <div className="badge-count">{entries.length}명 등록</div>
+          <input
+            type="month"
+            className="month-input"
+            value={isEditMode ? editMonth : month}
+            onChange={e => isEditMode ? setEditMonth(e.target.value) : setMonth(e.target.value)}
+          />
+          <div className={`badge-count ${isEditMode ? "badge-edit" : ""}`}>
+            {isEditMode ? `✏ 수정 중 (${employees.length}명)` : `${employees.length}명 입력 중`}
+          </div>
         </div>
       </header>
 
       <main>
-        {/* 좌측: 입력 폼 */}
-        <div>
-          <div className="panel">
-            <div className="panel-header">
-              <div className="step-num">1</div>
-              <h2>직원 정보 입력</h2>
-            </div>
-            <div className="form-body" onKeyDown={(e) => { if (e.key === "Enter") addEntry(); }}>
-              <div className="form-row">
-                <label>매장명 <span className="required">*</span></label>
-                <input value={form.store} onChange={(e) => set("store", e.target.value)} placeholder="스타필드 하남점" />
-              </div>
-              <div className="form-row-2col">
-                <div className="form-row">
-                  <label>성명 (한글) <span className="required">*</span></label>
-                  <input value={form.nameKo} onChange={(e) => set("nameKo", e.target.value)} placeholder="홍길동" />
-                </div>
-                <div className="form-row">
-                  <label>성명 (영문) <span className="required">*</span></label>
-                  <input value={form.nameEn} onChange={(e) => set("nameEn", e.target.value)} placeholder="Hong Gil Dong" />
-                </div>
-              </div>
-              <div className="form-row">
-                <label>직급</label>
-                <select value={form.rank} onChange={(e) => set("rank", e.target.value)}>
-                  {RANKS.map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-              <div className="form-row-2col">
-                <div className="form-row">
-                  <label>매장 번호</label>
-                  <input value={form.telStore} onChange={(e) => set("telStore", formatStoreTel(e.target.value))} placeholder="051-000-0000" inputMode="numeric" />
-                </div>
-                <div className="form-row">
-                  <label>개인 번호</label>
-                  <input value={form.telPersonal} onChange={(e) => {
-                    const val = e.target.value;
-                    const formatted = /[a-zA-Z가-힣]/.test(val) ? val : formatStoreTel(val);
-                    set("telPersonal", formatted);
-                  }} placeholder="010-0000-0000 (없으면 x)" />
-                </div>
-              </div>
-              <div className="form-row">
-                <label>매장 주소</label>
-                <input value={form.address} onChange={(e) => set("address", e.target.value)} placeholder="신세계 센텀시티몰점 B2F 요기보" />
-                <div className="hint">백화점·쇼핑몰명 + 층 + 요기보</div>
-              </div>
-              <div className="form-row">
-                <label>수량</label>
-                <input type="number" min={1} value={form.qty} onChange={(e) => set("qty", parseInt(e.target.value) || 100)} />
-              </div>
-              <button className="btn-add" onClick={addEntry}><span>＋</span> 목록에 추가</button>
-            </div>
+        {/* 좌측: 직원 정보 입력 */}
+        <div className={`panel ${isEditMode ? "panel-editing" : ""}`}>
+          <div className="panel-header">
+            <div className="step-num">1</div>
+            <h2>{isEditMode ? "발주 수정" : "직원 정보 입력"}</h2>
+            <span className="panel-sub">
+              {isEditMode ? "내용을 수정하고 저장하세요" : "직원 수만큼 추가하세요"}
+            </span>
+          </div>
 
-            {/* 미리보기 */}
-            <div className="preview-section">
-              <div className="preview-label">명함 미리보기 (앞면)</div>
-              {hasPreview ? (
-                <div className="card-preview">
-                  <div className="card-logo">yogibo</div>
-                  <div className="card-name-row">
-                    <div className="card-name-ko">{form.nameKo || "—"}</div>
-                    <div className="card-name-en">{form.nameEn}</div>
+          <div className="employees-list">
+            {employees.map((emp, idx) => (
+              <div key={idx} className="employee-card">
+                <div className="employee-card-header">
+                  <div className="employee-num">직원 {idx + 1}</div>
+                  {employees.length > 1 && (
+                    <button className="btn-remove-emp" onClick={() => removeEmployee(idx)} title="삭제">✕</button>
+                  )}
+                </div>
+                <div className="emp-form">
+                  <div className="form-row">
+                    <label>매장명 <span className="required">*</span></label>
+                    <input value={emp.store} onChange={e => setField(idx, "store", e.target.value)} placeholder="스타필드 하남점" />
                   </div>
-                  <div className="card-title">/ {form.rank}</div>
-                  <div className="card-store">{form.address || form.store}</div>
-                  <div className="card-contacts">
-                    {personalDisplay && <span><b>M</b>{personalDisplay}</span>}
-                    {form.telStore && <span><b>T</b>{form.telStore}</span>}
-                    <span><b>WEB</b>www.yogibo.kr</span>
-                    <span><b>SNS</b>yogibokorea</span>
+                  <div className="form-row-2col">
+                    <div className="form-row">
+                      <label>성명 (한글) <span className="required">*</span></label>
+                      <input value={emp.nameKo} onChange={e => setField(idx, "nameKo", e.target.value)} placeholder="홍길동" />
+                    </div>
+                    <div className="form-row">
+                      <label>성명 (영문) <span className="required">*</span></label>
+                      <input value={emp.nameEn} onChange={e => setField(idx, "nameEn", e.target.value)} placeholder="Hong Gil Dong" />
+                    </div>
+                  </div>
+                  <div className="form-row">
+                    <label>직급</label>
+                    <select value={emp.rank} onChange={e => setField(idx, "rank", e.target.value)}>
+                      {RANKS.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-row-2col">
+                    <div className="form-row">
+                      <label>매장 번호</label>
+                      <input value={emp.telStore} onChange={e => setField(idx, "telStore", formatTel(e.target.value))} placeholder="051-000-0000" inputMode="numeric" />
+                    </div>
+                    <div className="form-row">
+                      <label>개인 번호</label>
+                      <input value={emp.telPersonal} onChange={e => {
+                        const v = e.target.value;
+                        setField(idx, "telPersonal", /[a-zA-Z가-힣]/.test(v) ? v : formatTel(v));
+                      }} placeholder="010-0000-0000 (없으면 x)" />
+                    </div>
+                  </div>
+                  <div className="form-row">
+                    <label>매장 주소</label>
+                    <input value={emp.address} onChange={e => setField(idx, "address", e.target.value)} placeholder="신세계 센텀시티몰점 B2F 요기보" />
+                    <div className="hint">백화점·쇼핑몰명 + 층 + 요기보</div>
                   </div>
                 </div>
-              ) : (
-                <div className="card-placeholder">정보를 입력하면 미리보기가 표시됩니다</div>
-              )}
-            </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="order-actions">
+            <button className="btn-add-emp" onClick={addEmployee}>
+              <span>＋</span> 직원 추가
+            </button>
+            {isEditMode ? (
+              <>
+                <button className="btn-cancel-edit" onClick={cancelEdit}>취소</button>
+                <button className="btn-save" onClick={saveEdit} disabled={saving}>
+                  ✓ {saving ? "저장 중…" : "수정 저장"}
+                </button>
+              </>
+            ) : (
+              <button className="btn-save" onClick={saveOrder} disabled={saving}>
+                📋 {saving ? "저장 중…" : "목록 생성하기"}
+              </button>
+            )}
           </div>
         </div>
 
-        {/* 우측: 목록 + 액션 */}
+        {/* 우측: 발주 목록 */}
         <div className="panel table-panel">
           <div className="panel-header">
             <div className="step-num">2</div>
             <h2>발주 목록</h2>
+            <button className="btn-refresh" onClick={fetchOrders} title="새로고침">↻</button>
           </div>
 
-          <div className="table-actions">
-            <button className="btn-pdf" onClick={downloadPDF} disabled={busy}>
-              📄 {busy ? "생성 중…" : "PDF 발주서 생성 (1인 1파일)"}
-            </button>
-            {/* <button className="btn-csv" onClick={exportCSV}>⬇ CSV (일러스트 병합용)</button> */}
-            <button className="btn-clear-all" onClick={clearAll}>전체 삭제</button>
-          </div>
+          <div className="orders-list">
+            {orders.length === 0 ? (
+              <div className="empty-state">
+                <div className="icon">📋</div>
+                <p>아직 발주 목록이 없습니다</p>
+                <small>좌측에서 직원 정보를 입력하고<br />목록 생성하기를 눌러주세요</small>
+              </div>
+            ) : (
+              orders.map((order) => (
+                <div key={order._id} className={`order-row ${editingId === order._id ? "order-row-editing" : ""}`}>
+                  <div
+                    className="order-row-header"
+                    onClick={() => setExpanded(expanded === order._id ? null : order._id)}
+                  >
+                    <div className="order-meta">
+                      <span className="order-month">{order.month}</span>
+                      <span className="order-count">{order.peopleCount}명</span>
+                      {order.updatedAtKST && <span className="order-edited">수정됨</span>}
+                    </div>
+                    <div className="order-date">{order.createdAtKST || new Date(order.createdAt).toLocaleString("ko-KR")}</div>
+                    <button
+                      className="btn-edit-order"
+                      onClick={(e) => startEdit(order, e)}
+                      title="수정"
+                    >✏ 수정하기</button>
+                    <button
+                      className="btn-download-pdf"
+                      onClick={(e) => downloadPDF(order, e)}
+                      disabled={downloading === order._id}
+                      title="PDF 다운로드"
+                    >
+                      {downloading === order._id ? "⏳" : "⬇ 다운받기"}
+                    </button>
+                    <button
+                      className="btn-delete-order"
+                      onClick={(e) => deleteOrder(order._id, e)}
+                      title="삭제"
+                    >✕</button>
+                    <div className="order-chevron">{expanded === order._id ? "▲" : "▼"}</div>
+                  </div>
 
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th><th>매장명</th><th>성명(한글)</th><th>성명(영문)</th><th>직급</th>
-                  <th>매장번호</th><th>개인번호</th><th>주소</th><th>수량</th><th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.length === 0 ? (
-                  <tr>
-                    <td colSpan={10}>
-                      <div className="empty-state">
-                        <div className="icon">📋</div>
-                        <p>아직 등록된 직원이 없습니다</p>
-                        <small>왼쪽 폼에서 직원 정보를 입력하고 추가해주세요</small>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  entries.map((e, i) => (
-                    <tr key={i}>
-                      <td style={{ color: "var(--text-light)", fontSize: 11 }}>{i + 1}</td>
-                      <td className="store">{e.store}</td>
-                      <td className="name-ko">{e.nameKo}</td>
-                      <td className="name-en">{e.nameEn}</td>
-                      <td><span className={`rank-badge ${e.rank === "VMD" ? "vm" : ""}`}>{e.rank}</span></td>
-                      <td>{e.telStore || "—"}</td>
-                      <td>{e.telPersonal}</td>
-                      <td>{e.address || "—"}</td>
-                      <td style={{ fontWeight: 600 }}>{e.qty}매</td>
-                      <td><button className="btn-delete" onClick={() => deleteEntry(i)} title="삭제">✕</button></td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  {expanded === order._id && (
+                    <div className="order-detail">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>#</th><th>성명(한글)</th><th>직급</th><th>매장명</th><th>매장번호</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {order.people.map((p, i) => (
+                            <tr key={i}>
+                              <td style={{ color: "var(--text-light)", fontSize: 11 }}>{i + 1}</td>
+                              <td className="name-ko">{p.nameKo}</td>
+                              <td><span className={`rank-badge ${p.rank === "VMD" ? "vm" : ""}`}>{p.rank}</span></td>
+                              <td>{p.store}</td>
+                              <td>{p.telStore || "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
-
-          {entries.length > 0 && (
-            <div className="summary-bar">
-              <div className="summary-item">
-                <div className="s-label">총 인원</div>
-                <div className="s-val">{totals.people} <span>명</span></div>
-              </div>
-              <div className="summary-item">
-                <div className="s-label">총 수량</div>
-                <div className="s-val">{totals.qty.toLocaleString()} <span>매</span></div>
-              </div>
-              <div className="summary-item">
-                <div className="s-label">참여 매장</div>
-                <div className="s-val">{totals.stores} <span>개점</span></div>
-              </div>
-            </div>
-          )}
         </div>
       </main>
 
