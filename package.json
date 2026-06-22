@@ -9,7 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^149.0.0",
+    "@sparticuz/chromium-min": "^149.0.0",
     "dotenv": "^17.4.2",
     "jszip": "3.10.1",
     "mongodb": "^7.3.0",

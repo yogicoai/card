@@ -4,7 +4,7 @@ const nextConfig = {
   serverExternalPackages: [
     "puppeteer",
     "puppeteer-core",
-    "@sparticuz/chromium",
+    "@sparticuz/chromium-min",
   ],
 };
 

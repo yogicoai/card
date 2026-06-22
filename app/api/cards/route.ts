@@ -27,15 +27,16 @@ async function getBrowser() {
   const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
 
   if (isVercel) {
-    const chromium = (await import("@sparticuz/chromium")).default;
+    // chromium-min: 배포 패키지에 바이너리를 포함하지 않고 런타임에 URL로 다운로드
+    const chromium = (await import("@sparticuz/chromium-min")).default;
     const puppeteerCore = (await import("puppeteer-core")).default;
 
-    const execPath = await chromium.executablePath();
-    console.log("Chromium path:", execPath);
+    // puppeteer-core@24.9.0 에 맞는 Chromium 131 릴리즈
+    const CHROMIUM_URL =
+      "https://github.com/Sparticuz/chromium/releases/download/v131.0.0/chromium-v131.0.0-pack.tar";
 
-    if (!execPath) {
-      throw new Error("Chromium 실행 경로를 찾을 수 없습니다");
-    }
+    const execPath = await chromium.executablePath(CHROMIUM_URL);
+    console.log("Chromium executablePath:", execPath);
 
     return puppeteerCore.launch({
       args: [
