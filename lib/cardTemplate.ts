@@ -137,16 +137,15 @@ export function buildCardHtml(people: CardPerson[], logoDataUri: string, fontCss
   }
   .name-row { display: flex; align-items: baseline; }
   .name-ko {
-    font-weight: 700; font-size: 14pt; color: var(--ink);
-    /* letter-spacing: 2pt; (기존 자간 제거) */
+    font-weight: 700; font-size: 12pt; color: var(--ink);
   }
   .name-en {
-    font-weight: 500; font-size: 10pt; color: var(--ink);
-    margin-left: 6pt;
+    font-weight: 500; font-size: 8.5pt; color: var(--ink);
+    margin-left: 4pt;
   }
   .title {
-    font-weight: 400; font-size: 7pt; color: var(--ink);
-    margin-left: 4pt;
+    font-weight: 400; font-size: 6pt; color: var(--ink);
+    margin-left: 3pt;
   }
   .store {
     font-weight: 300; font-size: 5.8pt; color: var(--ink);
