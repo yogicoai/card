@@ -116,7 +116,7 @@ export function buildCardHtml(people: CardPerson[], logoDataUri: string, fontCss
   .back { display: flex; align-items: center; justify-content: center; }
   .slogan {
     font-family: Georgia, 'Times New Roman', serif;  /* 샘플의 세리프 슬로건 */
-    font-weight: 700;
+    font-weight: 400;
     font-size: 17pt;
     color: var(--teal);
     letter-spacing: 0.2pt;
@@ -141,7 +141,7 @@ export function buildCardHtml(people: CardPerson[], logoDataUri: string, fontCss
     letter-spacing: 2pt;          /* 샘플의 '문 경 애' 자간 */
   }
   .name-en {
-    font-weight: 500; font-size: 8pt; color: var(--ink);
+    font-weight: 700; font-size: 8pt; color: var(--ink);
     margin-left: 3pt;
   }
   .title {
