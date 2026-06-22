@@ -115,8 +115,7 @@ export function buildCardHtml(people: CardPerson[], logoDataUri: string, fontCss
   /* ── 1페이지: 뒷면(고정) ── */
   .back { display: flex; align-items: center; justify-content: center; }
   .slogan {
-    font-family: Georgia, 'Times New Roman', serif;  /* 샘플의 세리프 슬로건 */
-    font-weight: 400;
+    font-weight: 700;
     font-size: 17pt;
     color: var(--teal);
     letter-spacing: 0.2pt;
