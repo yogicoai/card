@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+import puppeteerCore from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 import puppeteer, { type Browser } from "puppeteer";
 import JSZip from "jszip";
 import { buildCardHtml, type CardPerson } from "@/lib/cardTemplate";
@@ -21,10 +21,10 @@ function pdfFileName(p: CardPerson, month?: string): string {
   return `${m}_매장_명함발주_${safe}(1인).pdf`;
 }
 
-async function logoDataUri(): Promise<string> {
-  const file = path.join(process.cwd(), "public", "yogibo-logo.png");
-  const buf = await readFile(file);
-  return `data:image/png;base64,${buf.toString("base64")}`;
+async function getFileAsBase64(url: string): Promise<string> {
+  const res = await fetch(url);
+  const buf = await res.arrayBuffer();
+  return Buffer.from(buf).toString("base64");
 }
 
 async function renderPdf(browser: Browser, html: string): Promise<Uint8Array> {
@@ -75,16 +75,34 @@ export async function POST(req: NextRequest) {
     // 저장이 실패하더라도 PDF 생성은 계속 진행하도록 함.
   }
 
-  const logo = await logoDataUri();
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+  const origin = req.nextUrl.origin;
+  const logoB64 = await getFileAsBase64(`${origin}/yogibo-logo.png`);
+  const logoDataUri = `data:image/png;base64,${logoB64}`;
+
+  const fontB64 = await getFileAsBase64(`${origin}/fonts/PretendardVariable.woff2`);
+  const fontCss = `@font-face{font-family:'Pretendard';font-style:normal;font-weight:100 900;font-display:block;src:url(data:font/woff2;base64,${fontB64}) format('woff2');}`;
+
+  const isVercel = process.env.VERCEL === "1" || process.env.VERCEL_ENV;
+  
+  let browser: Browser;
+  if (isVercel) {
+    browser = await puppeteerCore.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    }) as unknown as Browser;
+  } else {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+  }
 
   try {
     // 단일 인원 → PDF 그대로 / 복수 인원 → ZIP
     if (people.length === 1) {
-      const buf = await renderPdf(browser, buildCardHtml(people[0], logo));
+      const buf = await renderPdf(browser, buildCardHtml(people[0], logoDataUri, fontCss));
       const name = pdfFileName(people[0], payload.month);
       return new Response(buf as BodyInit, {
         status: 200,
@@ -97,7 +115,7 @@ export async function POST(req: NextRequest) {
 
     const zip = new JSZip();
     for (const p of people) {
-      const buf = await renderPdf(browser, buildCardHtml(p, logo));
+      const buf = await renderPdf(browser, buildCardHtml(p, logoDataUri, fontCss));
       zip.file(pdfFileName(p, payload.month), buf);
     }
     const zipBuf = await zip.generateAsync({ type: "uint8array" });

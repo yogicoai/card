@@ -2,21 +2,7 @@
 // - 1페이지(뒷면): 모든 사람 공통 "Discover the Feel" (고정)
 // - 2페이지(앞면): 사람마다 다른 이름/직급/매장/연락처 (가변)
 // 좌표·폰트·색상은 샘플 PDF(2026_06_매장_명함발주_문경애(1인).pdf) 내부에서 추출한 값.
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
-// 헤드리스 Chromium에는 한글 폰트가 없으므로 Pretendard를 base64로 직접 임베드한다.
-// (CDN @link 방식은 폰트 로딩 전에 렌더되어 한글이 ???로 깨질 수 있음)
-let _fontCss: string | null = null;
-function fontFaceCss(): string {
-  if (_fontCss) return _fontCss;
-  const file = path.join(process.cwd(), "public", "fonts", "PretendardVariable.woff2");
-  const b64 = readFileSync(file).toString("base64");
-  _fontCss =
-    `@font-face{font-family:'Pretendard';font-style:normal;font-weight:100 900;` +
-    `font-display:block;src:url(data:font/woff2;base64,${b64}) format('woff2');}`;
-  return _fontCss;
-}
+// 폰트 CSS는 API 라우트에서 넘겨받도록 수정 (Vercel 환경 지원)
 
 export interface CardPerson {
   store: string;        // 매장명 (파일명/주소 보조)
@@ -47,12 +33,7 @@ const hasPersonal = (p: CardPerson) => {
 // 전화번호 하이픈 유지 (요청에 따라 변경)
 const tel = (s: string) => esc((s || "").trim());
 
-/**
- * 한 사람의 2페이지 명함 HTML을 만든다.
- * @param p       직원 정보
- * @param logoDataUri  yogibo 로고 PNG(base64 data URI) — public/yogibo-logo.png 를 인라인
- */
-export function buildCardHtml(p: CardPerson, logoDataUri: string): string {
+export function buildCardHtml(p: CardPerson, logoDataUri: string, fontCss: string): string {
   const guides = SHOW_GUIDES
     ? `<div class="bleed-guide"></div><div class="trim-guide"></div>`
     : "";
@@ -62,7 +43,7 @@ export function buildCardHtml(p: CardPerson, logoDataUri: string): string {
 <head>
 <meta charset="UTF-8">
 <style>
-  ${fontFaceCss()}
+  ${fontCss}
   :root {
     --teal: #00BDD3;   /* M/T/WEB/SNS 라벨, 슬로건, 로고 물결 */
     --ink:  #404042;   /* 본문 텍스트 */

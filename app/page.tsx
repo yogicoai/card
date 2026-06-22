@@ -183,7 +183,11 @@ export default function Page() {
                 </div>
                 <div className="form-row">
                   <label>개인 번호</label>
-                  <input value={form.telPersonal} onChange={(e) => set("telPersonal", e.target.value)} placeholder="010-0000-0000 (없으면 x)" />
+                  <input value={form.telPersonal} onChange={(e) => {
+                    const val = e.target.value;
+                    const formatted = /[a-zA-Z가-힣]/.test(val) ? val : formatStoreTel(val);
+                    set("telPersonal", formatted);
+                  }} placeholder="010-0000-0000 (없으면 x)" />
                 </div>
               </div>
               <div className="form-row">
