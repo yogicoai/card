@@ -148,7 +148,7 @@ export function buildCardHtml(people: CardPerson[], logoDataUri: string, fontCss
     margin-left: 3pt;
   }
   .store {
-    font-weight: 300; font-size: 5.8pt; color: var(--ink);
+    font-weight: 500; font-size: 5.8pt; color: var(--ink);
     margin-top: 2mm;
   }
   .contacts { margin-top: 2.5mm; }
