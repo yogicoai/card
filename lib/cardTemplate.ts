@@ -1,0 +1,192 @@
+// 요기보 명함 2페이지 PDF 템플릿
+// - 1페이지(뒷면): 모든 사람 공통 "Discover the Feel" (고정)
+// - 2페이지(앞면): 사람마다 다른 이름/직급/매장/연락처 (가변)
+// 좌표·폰트·색상은 샘플 PDF(2026_06_매장_명함발주_문경애(1인).pdf) 내부에서 추출한 값.
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+// 헤드리스 Chromium에는 한글 폰트가 없으므로 Pretendard를 base64로 직접 임베드한다.
+// (CDN @link 방식은 폰트 로딩 전에 렌더되어 한글이 ???로 깨질 수 있음)
+let _fontCss: string | null = null;
+function fontFaceCss(): string {
+  if (_fontCss) return _fontCss;
+  const file = path.join(process.cwd(), "public", "fonts", "PretendardVariable.woff2");
+  const b64 = readFileSync(file).toString("base64");
+  _fontCss =
+    `@font-face{font-family:'Pretendard';font-style:normal;font-weight:100 900;` +
+    `font-display:block;src:url(data:font/woff2;base64,${b64}) format('woff2');}`;
+  return _fontCss;
+}
+
+export interface CardPerson {
+  store: string;        // 매장명 (파일명/주소 보조)
+  nameKo: string;       // 성명(한글)  예: 문경애
+  nameEn: string;       // 성명(영문)  예: Moon Kyung Ae
+  rank: string;         // 직급        예: Store Manager
+  telStore: string;     // 매장 번호(T)
+  telPersonal: string;  // 개인 번호(M) — 'x'/빈값이면 숨김
+  address: string;      // 매장 주소 한 줄  예: 신세계 센텀시티몰점 B2F 요기보
+  qty?: number;
+}
+
+// 인쇄용 재단선/블리드 가이드 표시 여부 (최종 입고 시 false 권장)
+const SHOW_GUIDES = true;
+
+function esc(s: string): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+const hasPersonal = (p: CardPerson) => {
+  const v = (p.telPersonal || "").trim().toLowerCase();
+  return v && v !== "x";
+};
+
+// 샘플 명함은 전화번호를 하이픈 없이 공백으로 구분: 010-4676-3827 → 010 4676 3827
+const tel = (s: string) => esc((s || "").trim().replace(/-/g, " "));
+
+/**
+ * 한 사람의 2페이지 명함 HTML을 만든다.
+ * @param p       직원 정보
+ * @param logoDataUri  yogibo 로고 PNG(base64 data URI) — public/yogibo-logo.png 를 인라인
+ */
+export function buildCardHtml(p: CardPerson, logoDataUri: string): string {
+  const guides = SHOW_GUIDES
+    ? `<div class="bleed-guide"></div><div class="trim-guide"></div>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<style>
+  ${fontFaceCss()}
+  :root {
+    --teal: #00BDD3;   /* M/T/WEB/SNS 라벨, 슬로건, 로고 물결 */
+    --ink:  #404042;   /* 본문 텍스트 */
+    --trim: #2E3092;    /* 재단선 가이드(파랑) */
+    --bleed:#ED1C23;    /* 블리드 가이드(빨강) */
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* 92×52mm = 90×50mm 재단 + 사방 1mm 블리드 */
+  @page { size: 92mm 52mm; margin: 0; }
+
+  html, body { font-family: 'Pretendard', sans-serif; color: var(--ink); }
+
+  .page {
+    position: relative;
+    width: 92mm;
+    height: 52mm;
+    background: #fff;
+    overflow: hidden;
+    page-break-after: always;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* ── 인쇄 가이드 ── */
+  .bleed-guide {
+    position: absolute; inset: 0;
+    border: 0.3pt solid var(--bleed);
+    pointer-events: none;
+  }
+  .trim-guide {
+    position: absolute; inset: 1mm;        /* 1mm 안쪽 = 재단선 */
+    border: 0.3pt solid var(--trim);
+    pointer-events: none;
+  }
+
+  /* ── 1페이지: 뒷면(고정) ── */
+  .back { display: flex; align-items: center; justify-content: center; }
+  .slogan {
+    font-family: Georgia, 'Times New Roman', serif;  /* 샘플의 세리프 슬로건 */
+    font-weight: 700;
+    font-size: 17pt;
+    color: var(--teal);
+    letter-spacing: 0.2pt;
+  }
+
+  /* ── 2페이지: 앞면(가변) ── */
+  .logo {
+    position: absolute;
+    top: 4.7mm;
+    right: 6.3mm;     /* 로고 오른쪽 끝 = 하단 SNS 오른쪽 끝 (동일 우측 여백) */
+    width: 23.3mm;
+    height: auto;
+  }
+  .info {
+    position: absolute;
+    left: 6.3mm;
+    bottom: 6.4mm;
+  }
+  .name-row { display: flex; align-items: baseline; }
+  .name-ko {
+    font-weight: 700; font-size: 12pt; color: var(--ink);
+    letter-spacing: 2pt;          /* 샘플의 '문 경 애' 자간 */
+  }
+  .name-en {
+    font-weight: 500; font-size: 8pt; color: var(--ink);
+    margin-left: 3pt;
+  }
+  .title {
+    font-weight: 400; font-size: 5.5pt; color: var(--ink);
+    margin-left: 4pt;
+  }
+  .store {
+    font-weight: 300; font-size: 5.8pt; color: var(--ink);
+    margin-top: 2mm;
+  }
+  .contacts { margin-top: 2.5mm; }
+  .contact-line { display: flex; align-items: baseline; }
+  .contact-line + .contact-line { margin-top: 1.1mm; }
+  .lbl {
+    font-weight: 600; font-size: 7pt; color: var(--teal);
+    width: 8pt; flex-shrink: 0;
+  }
+  .val { font-weight: 300; font-size: 7pt; color: var(--ink); }
+  .val.lg { font-size: 8pt; }
+  /* 하단 줄: T(좌) · WEB(중앙) · SNS(우) 분산. 너비 = 좌여백(6.3)~우여백(6.3) → SNS 끝이 로고 끝과 정렬 */
+  .row-web { width: 79.4mm; justify-content: space-between; }
+  .row-web .seg { display: flex; align-items: baseline; }
+  .row-web .lbl { width: auto; margin-right: 3pt; }
+</style>
+</head>
+<body>
+
+  <!-- 1페이지 · 뒷면 (모든 사람 공통) -->
+  <section class="page back">
+    ${guides}
+    <div class="slogan">Discover the Feel</div>
+  </section>
+
+  <!-- 2페이지 · 앞면 (사람마다 다름) -->
+  <section class="page front">
+    ${guides}
+    <img class="logo" src="${logoDataUri}" alt="yogibo">
+    <div class="info">
+      <div class="name-row">
+        <span class="name-ko">${esc(p.nameKo)}</span>
+        <span class="name-en">${esc(p.nameEn)}</span>
+        <span class="title">/ ${esc(p.rank)}</span>
+      </div>
+      <div class="store">${esc(p.address || p.store)}</div>
+      <div class="contacts">
+        ${
+          hasPersonal(p)
+            ? `<div class="contact-line"><span class="lbl">M</span><span class="val">${tel(p.telPersonal)}</span></div>`
+            : ""
+        }
+        <div class="contact-line row-web">
+          <span class="seg"><span class="lbl">T</span><span class="val">${tel(p.telStore)}</span></span>
+          <span class="seg"><span class="lbl">WEB</span><span class="val lg">www.yogibo.kr</span></span>
+          <span class="seg"><span class="lbl">SNS</span><span class="val lg">yogibokorea</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</body>
+</html>`;
+}

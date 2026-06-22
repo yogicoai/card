@@ -1,0 +1,100 @@
+import { NextRequest } from "next/server";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import puppeteer, { type Browser } from "puppeteer";
+import JSZip from "jszip";
+import { buildCardHtml, type CardPerson } from "@/lib/cardTemplate";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 120;
+
+interface Payload {
+  people: CardPerson[];
+  month?: string; // "2026-06"
+}
+
+// 파일명: 2026_06_매장_명함발주_문경애(1인).pdf
+function pdfFileName(p: CardPerson, month?: string): string {
+  const m = (month || "").replace("-", "_") || "0000_00";
+  const safe = (p.nameKo || "무명").replace(/[\\/:*?"<>|]/g, "");
+  return `${m}_매장_명함발주_${safe}(1인).pdf`;
+}
+
+async function logoDataUri(): Promise<string> {
+  const file = path.join(process.cwd(), "public", "yogibo-logo.png");
+  const buf = await readFile(file);
+  return `data:image/png;base64,${buf.toString("base64")}`;
+}
+
+async function renderPdf(browser: Browser, html: string): Promise<Uint8Array> {
+  const page = await browser.newPage();
+  try {
+    // 폰트·로고는 data URI로 임베드되어 외부 요청이 없으므로 "load" 로 충분.
+    await page.setContent(html, { waitUntil: "load" });
+    // 임베드된 Pretendard 폰트 적용 완료까지 대기 (한글 깨짐 방지)
+    await page.evaluateHandle("document.fonts.ready");
+    return await page.pdf({
+      printBackground: true,
+      preferCSSPageSize: true, // @page { size: 92mm 52mm } 사용
+    });
+  } finally {
+    await page.close();
+  }
+}
+
+export async function POST(req: NextRequest) {
+  let payload: Payload;
+  try {
+    payload = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "잘못된 요청 본문" }), { status: 400 });
+  }
+
+  const people = Array.isArray(payload.people) ? payload.people : [];
+  if (people.length === 0) {
+    return new Response(JSON.stringify({ error: "등록된 직원이 없습니다" }), { status: 400 });
+  }
+
+  const logo = await logoDataUri();
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
+
+  try {
+    // 단일 인원 → PDF 그대로 / 복수 인원 → ZIP
+    if (people.length === 1) {
+      const buf = await renderPdf(browser, buildCardHtml(people[0], logo));
+      const name = pdfFileName(people[0], payload.month);
+      return new Response(buf as BodyInit, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
+        },
+      });
+    }
+
+    const zip = new JSZip();
+    for (const p of people) {
+      const buf = await renderPdf(browser, buildCardHtml(p, logo));
+      zip.file(pdfFileName(p, payload.month), buf);
+    }
+    const zipBuf = await zip.generateAsync({ type: "uint8array" });
+    const m = (payload.month || "").replace("-", "") || "000000";
+    const zipName = `요기보_명함발주_${m}.zip`;
+    return new Response(zipBuf as BodyInit, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(zipName)}`,
+      },
+    });
+  } catch (err) {
+    console.error("PDF 생성 실패:", err);
+    return new Response(JSON.stringify({ error: "PDF 생성 중 오류" }), { status: 500 });
+  } finally {
+    await browser.close();
+  }
+}

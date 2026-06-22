@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>요기보 명함 발주 관리</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+  :root {
+    --yogibo-teal: #00B5B8;
+    --yogibo-teal-light: #E6F9F9;
+    --yogibo-teal-mid: #b3eaeb;
+    --text-dark: #1a1a2e;
+    --text-mid: #4a4a6a;
+    --text-light: #9a9ab0;
+    --bg: #f4f6fb;
+    --surface: #ffffff;
+    --border: #e2e6f0;
+    --danger: #e05252;
+    --success: #2ecc71;
+    --row-hover: #f0fafa;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text-dark);
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 2px solid var(--yogibo-teal);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,181,184,0.08);
+  }
+
+  .logo-mark {
+    width: 36px; height: 36px;
+    background: var(--yogibo-teal);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 14px; letter-spacing: -0.5px;
+  }
+
+  header h1 {
+    font-size: 16px; font-weight: 700; color: var(--text-dark);
+  }
+
+  header span {
+    font-size: 12px; color: var(--text-light); font-weight: 400;
+  }
+
+  .header-right {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .badge-count {
+    background: var(--yogibo-teal-light);
+    color: var(--yogibo-teal);
+    font-size: 12px; font-weight: 700;
+    padding: 4px 10px; border-radius: 20px;
+  }
+
+  /* ── Layout ── */
+  main {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 28px 24px;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* ── Panel ── */
+  .panel {
+    background: var(--surface);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .panel-header h2 {
+    font-size: 13px; font-weight: 700; color: var(--text-dark);
+  }
+
+  .panel-header .step-num {
+    width: 22px; height: 22px;
+    background: var(--yogibo-teal);
+    color: white;
+    border-radius: 50%;
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* ── Form ── */
+  .form-body {
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-mid);
+    letter-spacing: 0.3px;
+  }
+
+  label .required {
+    color: var(--yogibo-teal);
+    margin-left: 2px;
+  }
+
+  input, select {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--text-dark);
+    background: white;
+    transition: border-color 0.15s;
+    outline: none;
+  }
+
+  input:focus, select:focus {
+    border-color: var(--yogibo-teal);
+    box-shadow: 0 0 0 3px rgba(0,181,184,0.12);
+  }
+
+  input::placeholder { color: var(--text-light); }
+
+  .form-row-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .hint {
+    font-size: 10px;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
+
+  .btn-add {
+    margin-top: 4px;
+    padding: 11px;
+    background: var(--yogibo-teal);
+    color: white;
+    border: none;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+
+  .btn-add:hover { background: #009ea1; }
+  .btn-add:active { transform: scale(0.98); }
+
+  /* ── Preview Card ── */
+  .preview-section {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .preview-label {
+    font-size: 10px; font-weight: 700;
+    color: var(--text-light);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .card-preview {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 80px;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+
+  .card-preview .card-logo {
+    position: absolute; top: 12px; right: 14px;
+    font-size: 14px; font-weight: 800; color: var(--yogibo-teal);
+    letter-spacing: -1px;
+  }
+
+  .card-name-ko {
+    font-size: 16px; font-weight: 700; color: var(--text-dark);
+    letter-spacing: 2px;
+  }
+
+  .card-name-row {
+    display: flex; align-items: baseline; gap: 6px;
+  }
+
+  .card-name-en {
+    font-size: 10px; color: var(--text-mid); font-weight: 400;
+  }
+
+  .card-title {
+    font-size: 9.5px; color: var(--text-mid); margin-top: 1px;
+  }
+
+  .card-store {
+    font-size: 9.5px; color: var(--text-mid);
+    margin-top: 6px;
+  }
+
+  .card-contacts {
+    display: flex; gap: 14px; margin-top: 4px;
+  }
+
+  .card-contacts span {
+    font-size: 9px; color: var(--text-light);
+  }
+
+  .card-contacts span b {
+    color: var(--yogibo-teal);
+    font-weight: 700; margin-right: 3px;
+  }
+
+  .card-placeholder {
+    display: flex; align-items: center; justify-content: center;
+    height: 70px;
+    color: var(--text-light);
+    font-size: 11px;
+    border: 1.5px dashed var(--border);
+    border-radius: 6px;
+  }
+
+  /* ── Table Panel ── */
+  .table-panel {
+    display: flex; flex-direction: column; gap: 0;
+  }
+
+  .table-actions {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .btn-csv {
+    padding: 8px 16px;
+    background: var(--yogibo-teal);
+    color: white;
+    border: none; border-radius: 8px;
+    font-size: 12px; font-weight: 700;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: background 0.15s;
+  }
+
+  .btn-csv:hover { background: #009ea1; }
+
+  .btn-clear-all {
+    padding: 8px 14px;
+    background: transparent;
+    color: var(--danger);
+    border: 1.5px solid var(--danger);
+    border-radius: 8px;
+    font-size: 12px; font-weight: 600;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+    margin-left: auto;
+  }
+
+  .btn-clear-all:hover { background: #fff5f5; }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  thead th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-light);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+
+  tbody tr:hover { background: var(--row-hover); }
+
+  tbody td {
+    padding: 10px 14px;
+    color: var(--text-dark);
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  td.store { font-weight: 600; color: var(--text-dark); }
+
+  td.name-ko { font-weight: 700; color: var(--text-dark); }
+
+  td.name-en { color: var(--text-mid); }
+
+  .rank-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--yogibo-teal-light);
+    color: var(--yogibo-teal);
+  }
+
+  .rank-badge.vm {
+    background: #f0f0ff;
+    color: #6060c0;
+  }
+
+  .btn-delete {
+    width: 26px; height: 26px;
+    border: none;
+    background: transparent;
+    color: var(--text-light);
+    cursor: pointer;
+    border-radius: 6px;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .btn-delete:hover {
+    background: #ffe5e5;
+    color: var(--danger);
+  }
+
+  .empty-state {
+    padding: 48px 20px;
+    text-align: center;
+    color: var(--text-light);
+  }
+
+  .empty-state .icon { font-size: 36px; margin-bottom: 10px; }
+  .empty-state p { font-size: 13px; }
+  .empty-state small { font-size: 11px; color: var(--text-light); margin-top: 4px; display: block; }
+
+  /* ── Summary bar ── */
+  .summary-bar {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    display: flex; gap: 20px; align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .summary-item {
+    display: flex; flex-direction: column; gap: 1px;
+  }
+
+  .summary-item .s-label {
+    font-size: 9px; font-weight: 700;
+    color: var(--text-light); letter-spacing: 0.8px; text-transform: uppercase;
+  }
+
+  .summary-item .s-val {
+    font-size: 16px; font-weight: 700; color: var(--text-dark);
+  }
+
+  .summary-item .s-val span {
+    font-size: 11px; color: var(--text-mid); font-weight: 400;
+  }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--text-dark);
+    color: white;
+    padding: 11px 18px;
+    border-radius: 10px;
+    font-size: 13px; font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.25s;
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ── Month selector ── */
+  .month-input {
+    padding: 6px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--text-dark);
+    outline: none;
+    width: 130px;
+  }
+
+  .month-input:focus {
+    border-color: var(--yogibo-teal);
+  }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">yg</div>
+  <div>
+    <h1>명함 발주 관리</h1>
+    <span>요기보코리아 마케팅디자인팀</span>
+  </div>
+  <div class="header-right">
+    <input type="month" id="monthInput" class="month-input">
+    <div class="badge-count" id="headerCount">0명 등록</div>
+  </div>
+</header>
+
+<main>
+  <!-- 좌측: 입력 폼 -->
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="step-num">1</div>
+        <h2>직원 정보 입력</h2>
+      </div>
+      <div class="form-body">
+        <div class="form-row">
+          <label>매장명 <span class="required">*</span></label>
+          <input type="text" id="f_store" placeholder="스타필드 하남점">
+        </div>
+        <div class="form-row-2col">
+          <div class="form-row">
+            <label>성명 (한글) <span class="required">*</span></label>
+            <input type="text" id="f_name_ko" placeholder="홍길동">
+          </div>
+          <div class="form-row">
+            <label>성명 (영문) <span class="required">*</span></label>
+            <input type="text" id="f_name_en" placeholder="Hong Gil Dong">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>직급</label>
+          <select id="f_rank">
+            <option value="Store Manager">Store Manager</option>
+            <option value="VMD">VMD</option>
+            <option value="Staff">Staff</option>
+          </select>
+        </div>
+        <div class="form-row-2col">
+          <div class="form-row">
+            <label>매장 번호</label>
+            <input type="text" id="f_tel_store" placeholder="02-0000-0000">
+          </div>
+          <div class="form-row">
+            <label>개인 번호</label>
+            <input type="text" id="f_tel_personal" placeholder="010-0000-0000 (없으면 x)">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>매장 주소</label>
+          <input type="text" id="f_address" placeholder="스타필드 하남점 3층">
+          <div class="hint">백화점·쇼핑몰명 + 층만 기재</div>
+        </div>
+        <div class="form-row">
+          <label>수량</label>
+          <input type="number" id="f_qty" placeholder="100" value="100" min="1">
+        </div>
+        <button class="btn-add" onclick="addEntry()">
+          <span>＋</span> 목록에 추가
+        </button>
+      </div>
+
+      <!-- 미리보기 -->
+      <div class="preview-section">
+        <div class="preview-label">명함 미리보기</div>
+        <div id="cardPreview" class="card-placeholder">정보를 입력하면 미리보기가 표시됩니다</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 우측: 목록 + 액션 -->
+  <div class="panel table-panel">
+    <div class="panel-header">
+      <div class="step-num">2</div>
+      <h2>발주 목록</h2>
+    </div>
+
+    <div class="table-actions">
+      <button class="btn-csv" onclick="exportCSV()">
+        ⬇ CSV 다운로드 (일러스트 데이터 병합용)
+      </button>
+      <button class="btn-clear-all" onclick="clearAll()">전체 삭제</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>매장명</th>
+            <th>성명(한글)</th>
+            <th>성명(영문)</th>
+            <th>직급</th>
+            <th>매장번호</th>
+            <th>개인번호</th>
+            <th>주소</th>
+            <th>수량</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="entryTable">
+          <tr id="emptyRow">
+            <td colspan="10">
+              <div class="empty-state">
+                <div class="icon">📋</div>
+                <p>아직 등록된 직원이 없습니다</p>
+                <small>왼쪽 폼에서 직원 정보를 입력하고 추가해주세요</small>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="summary-bar" id="summaryBar" style="display:none;">
+      <div class="summary-item">
+        <div class="s-label">총 인원</div>
+        <div class="s-val" id="sumPeople">0 <span>명</span></div>
+      </div>
+      <div class="summary-item">
+        <div class="s-label">총 수량</div>
+        <div class="s-val" id="sumQty">0 <span>매</span></div>
+      </div>
+      <div class="summary-item">
+        <div class="s-label">참여 매장</div>
+        <div class="s-val" id="sumStores">0 <span>개점</span></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let entries = [];
+
+  // 이번달 기본값
+  const now = new Date();
+  document.getElementById('monthInput').value =
+    `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+  // 실시간 미리보기
+  ['f_store','f_name_ko','f_name_en','f_rank','f_tel_store','f_tel_personal','f_address'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updatePreview);
+  });
+
+  function updatePreview() {
+    const ko = document.getElementById('f_name_ko').value.trim();
+    const en = document.getElementById('f_name_en').value.trim();
+    const rank = document.getElementById('f_rank').value;
+    const store = document.getElementById('f_store').value.trim();
+    const tel = document.getElementById('f_tel_store').value.trim();
+    const personal = document.getElementById('f_tel_personal').value.trim();
+    const addr = document.getElementById('f_address').value.trim();
+
+    if (!ko && !en) {
+      document.getElementById('cardPreview').outerHTML = `<div id="cardPreview" class="card-placeholder">정보를 입력하면 미리보기가 표시됩니다</div>`;
+      return;
+    }
+
+    const personalDisplay = (personal && personal !== 'x' && personal !== 'X') ? personal : '';
+
+    const html = `
+      <div class="card-preview" id="cardPreview">
+        <div class="card-logo">yogibo</div>
+        <div class="card-name-row">
+          <div class="card-name-ko">${ko || '—'}</div>
+          <div class="card-name-en">${en || ''}</div>
+        </div>
+        <div class="card-title">${rank}</div>
+        <div class="card-store">${addr || store || ''}</div>
+        <div class="card-contacts">
+          ${tel ? `<span><b>T</b>${tel}</span>` : ''}
+          ${personalDisplay ? `<span><b>M</b>${personalDisplay}</span>` : ''}
+          <span><b>WEB</b>www.yogibo.kr</span>
+          <span><b>SNS</b>yogibokorea</span>
+        </div>
+      </div>`;
+
+    const prev = document.getElementById('cardPreview');
+    prev.outerHTML = html;
+  }
+
+  function addEntry() {
+    const store = document.getElementById('f_store').value.trim();
+    const nameKo = document.getElementById('f_name_ko').value.trim();
+    const nameEn = document.getElementById('f_name_en').value.trim();
+    const rank = document.getElementById('f_rank').value;
+    const telStore = document.getElementById('f_tel_store').value.trim();
+    const telPersonal = document.getElementById('f_tel_personal').value.trim() || 'x';
+    const address = document.getElementById('f_address').value.trim();
+    const qty = parseInt(document.getElementById('f_qty').value) || 100;
+
+    if (!store || !nameKo || !nameEn) {
+      showToast('⚠ 매장명, 성명(한글), 성명(영문)은 필수입니다');
+      return;
+    }
+
+    entries.push({ store, nameKo, nameEn, rank, telStore, telPersonal, address, qty });
+    renderTable();
+    clearForm();
+    showToast(`✓ ${nameKo} 추가 완료`);
+  }
+
+  function clearForm() {
+    ['f_store','f_name_ko','f_name_en','f_tel_store','f_tel_personal','f_address'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('f_qty').value = '100';
+    document.getElementById('f_rank').value = 'Store Manager';
+    updatePreview();
+  }
+
+  function deleteEntry(idx) {
+    entries.splice(idx, 1);
+    renderTable();
+  }
+
+  function clearAll() {
+    if (entries.length === 0) return;
+    if (confirm(`전체 ${entries.length}명 삭제하시겠습니까?`)) {
+      entries = [];
+      renderTable();
+    }
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('entryTable');
+    const summaryBar = document.getElementById('summaryBar');
+
+    if (entries.length === 0) {
+      tbody.innerHTML = `<tr id="emptyRow"><td colspan="10">
+        <div class="empty-state">
+          <div class="icon">📋</div>
+          <p>아직 등록된 직원이 없습니다</p>
+          <small>왼쪽 폼에서 직원 정보를 입력하고 추가해주세요</small>
+        </div>
+      </td></tr>`;
+      summaryBar.style.display = 'none';
+    } else {
+      tbody.innerHTML = entries.map((e, i) => `
+        <tr>
+          <td style="color:var(--text-light);font-size:11px;">${i+1}</td>
+          <td class="store">${e.store}</td>
+          <td class="name-ko">${e.nameKo}</td>
+          <td class="name-en">${e.nameEn}</td>
+          <td><span class="rank-badge ${e.rank === 'VMD' ? 'vm' : ''}">${e.rank}</span></td>
+          <td>${e.telStore || '—'}</td>
+          <td>${e.telPersonal}</td>
+          <td>${e.address || '—'}</td>
+          <td style="font-weight:600;">${e.qty}매</td>
+          <td><button class="btn-delete" onclick="deleteEntry(${i})" title="삭제">✕</button></td>
+        </tr>
+      `).join('');
+
+      const totalQty = entries.reduce((a, b) => a + b.qty, 0);
+      const uniqueStores = new Set(entries.map(e => e.store)).size;
+      document.getElementById('sumPeople').innerHTML = `${entries.length} <span>명</span>`;
+      document.getElementById('sumQty').innerHTML = `${totalQty.toLocaleString()} <span>매</span>`;
+      document.getElementById('sumStores').innerHTML = `${uniqueStores} <span>개점</span>`;
+      summaryBar.style.display = 'flex';
+    }
+
+    document.getElementById('headerCount').textContent = `${entries.length}명 등록`;
+  }
+
+  function exportCSV() {
+    if (entries.length === 0) {
+      showToast('⚠ 등록된 직원이 없습니다');
+      return;
+    }
+
+    // Illustrator 데이터 병합 형식 (탭 구분 또는 쉼표)
+    // 헤더는 AI 템플릿 변수명과 일치해야 함
+    const headers = [
+      '성명한글', '성명영문', '직급', '매장번호', '개인번호', '매장주소', '수량'
+    ];
+
+    const rows = entries.map(e => [
+      e.nameKo,
+      e.nameEn,
+      e.rank,
+      e.telStore,
+      e.telPersonal === 'x' ? '' : e.telPersonal,
+      e.address || e.store,
+      e.qty
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+
+    const csvContent = '\uFEFF' + [headers.map(h => `"${h}"`).join(','), ...rows].join('\n');
+
+    const monthVal = document.getElementById('monthInput').value.replace('-', '');
+    const filename = `요기보_명함발주_${monthVal}.csv`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    showToast(`✓ ${filename} 다운로드 완료`);
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // Enter키로 추가
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.activeElement.tagName === 'INPUT') {
+      addEntry();
+    }
+  });
+</script>
+</body>
+</html>
