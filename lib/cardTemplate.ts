@@ -115,6 +115,7 @@ export function buildCardHtml(people: CardPerson[], logoDataUri: string, fontCss
   /* ── 1페이지: 뒷면(고정) ── */
   .back { display: flex; align-items: center; justify-content: center; }
   .slogan {
+    font-family: 'ITC Souvenir', 'Souvenir', Georgia, serif;
     font-weight: 700;
     font-size: 17pt;
     color: var(--teal);
@@ -136,11 +137,11 @@ export function buildCardHtml(people: CardPerson[], logoDataUri: string, fontCss
   }
   .name-row { display: flex; align-items: baseline; }
   .name-ko {
-    font-weight: 800; font-size: 14pt; color: var(--ink);
+    font-weight: 700; font-size: 14pt; color: var(--ink);
     /* letter-spacing: 2pt; (기존 자간 제거) */
   }
   .name-en {
-    font-weight: 700; font-size: 10pt; color: var(--ink);
+    font-weight: 500; font-size: 10pt; color: var(--ink);
     margin-left: 6pt;
   }
   .title {
