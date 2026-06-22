@@ -137,15 +137,15 @@ export function buildCardHtml(people: CardPerson[], logoDataUri: string, fontCss
   }
   .name-row { display: flex; align-items: baseline; }
   .name-ko {
-    font-weight: 700; font-size: 12pt; color: var(--ink);
-    letter-spacing: 2pt;          /* 샘플의 '문 경 애' 자간 */
+    font-weight: 800; font-size: 14pt; color: var(--ink);
+    /* letter-spacing: 2pt; (기존 자간 제거) */
   }
   .name-en {
-    font-weight: 700; font-size: 8pt; color: var(--ink);
-    margin-left: 3pt;
+    font-weight: 700; font-size: 10pt; color: var(--ink);
+    margin-left: 6pt;
   }
   .title {
-    font-weight: 400; font-size: 5.5pt; color: var(--ink);
+    font-weight: 400; font-size: 7pt; color: var(--ink);
     margin-left: 4pt;
   }
   .store {
