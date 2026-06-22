@@ -3,7 +3,7 @@ import { buildCardHtml, type CardPerson } from "@/lib/cardTemplate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 interface Payload {
   people: CardPerson[];
@@ -18,7 +18,7 @@ function pdfFileName(p: CardPerson, month?: string): string {
 
 async function getFileAsBase64(url: string): Promise<string> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`파일 로드 실패: ${url}`);
+  if (!res.ok) throw new Error(`파일 로드 실패 (${res.status}): ${url}`);
   const buf = await res.arrayBuffer();
   return Buffer.from(buf).toString("base64");
 }
@@ -27,25 +27,37 @@ async function getBrowser() {
   const isVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
 
   if (isVercel) {
-    // Vercel 서버리스 환경: sparticuz/chromium 사용
     const chromium = (await import("@sparticuz/chromium")).default;
     const puppeteerCore = (await import("puppeteer-core")).default;
 
-    const executablePath = await chromium.executablePath();
+    const execPath = await chromium.executablePath();
+    console.log("Chromium path:", execPath);
+
+    if (!execPath) {
+      throw new Error("Chromium 실행 경로를 찾을 수 없습니다");
+    }
+
     return puppeteerCore.launch({
-      args: chromium.args,
-      executablePath,
+      args: [
+        ...chromium.args,
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--single-process",
+      ],
+      executablePath: execPath,
       headless: true,
       defaultViewport: { width: 1280, height: 720 },
     });
-  } else {
-    // 로컬 개발 환경: 일반 puppeteer 사용
-    const puppeteer = (await import("puppeteer")).default;
-    return puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
   }
+
+  // 로컬 개발 환경
+  const puppeteer = (await import("puppeteer")).default;
+  return puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -62,8 +74,8 @@ export async function POST(req: NextRequest) {
   }
 
   const origin = req.nextUrl.origin;
-
   let browser: Awaited<ReturnType<typeof getBrowser>> | null = null;
+
   try {
     const [logoB64, fontB64] = await Promise.all([
       getFileAsBase64(`${origin}/yogibo-logo.png`),
@@ -77,7 +89,6 @@ export async function POST(req: NextRequest) {
     const page = await browser.newPage();
 
     await page.setContent(buildCardHtml(people, logoDataUri, fontCss), { waitUntil: "domcontentloaded" });
-    // 한글 폰트 로딩 대기 (500ms)
     await new Promise(r => setTimeout(r, 500));
 
     const buf = await page.pdf({
@@ -98,10 +109,15 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("PDF 생성 실패:", err);
-    const message = err instanceof Error ? err.message : "알 수 없는 오류";
-    return new Response(JSON.stringify({ error: `PDF 생성 실패: ${message}` }), { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("PDF 생성 실패:", message);
+    return new Response(
+      JSON.stringify({ error: `PDF 생성 실패: ${message}` }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   } finally {
-    if (browser) await browser.close();
+    if (browser) {
+      try { await browser.close(); } catch { /* 무시 */ }
+    }
   }
 }

@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "app/api/cards/route.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "app/api/orders/route.ts": {
+      "maxDuration": 10
+    }
+  }
+}
